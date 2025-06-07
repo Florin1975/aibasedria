@@ -1,0 +1,21 @@
+set -e
+
+echo "Stopping AI-based Regulatory Impact Assessment Tool..."
+
+# Check if running in development or production mode
+if [ "$1" == "dev" ]; then
+    echo "Stopping development servers..."
+    
+    # Find and kill backend process
+    pkill -f "python3 app.py" || echo "Backend server not running"
+    
+    # Find and kill frontend process
+    pkill -f "npm run dev" || echo "Frontend server not running"
+else
+    echo "Stopping production services..."
+    
+    # Stop using Docker Compose
+    docker-compose down
+fi
+
+echo "Services stopped successfully!"
