@@ -1,0 +1,54 @@
+set -e
+
+echo "Configuring AI-based Regulatory Impact Assessment Tool..."
+
+# Generate configuration files
+echo "Generating configuration files..."
+
+# Backend configuration
+cat > config/backend.env << EOL
+PORT=8000
+DEBUG=false
+SECRET_KEY=$(openssl rand -hex 32 )
+DATABASE_URL=sqlite:///data/ria.db
+UPLOAD_FOLDER=data/uploads
+LOG_LEVEL=INFO
+EOL
+
+# Frontend configuration
+cat > frontend/.env.local << EOL
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
+NEXT_PUBLIC_APP_NAME=AI-based Regulatory Impact Assessment Tool
+EOL
+
+# Docker Compose configuration
+cat > docker-compose.yml << EOL
+version: '3'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    env_file:
+      - ./config/backend.env
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000/api
+    depends_on:
+      - backend
+    restart: unless-stopped
+EOL
+
+# Create database directory
+mkdir -p data/uploads
+
+echo "Configuration completed successfully!"
