@@ -1,0 +1,430 @@
+import React, { useEffect, useRef } from 'react';
+import * as d3 from 'd3';
+import { Card, CardHeader, CardContent, Typography, Box } from '@mui/material';
+
+const PolicyEffectivenessRadar = ({ data }) => {
+  const radarRef = useRef(null);
+  
+  useEffect(() => {
+    if (!data || !data.dimensions || !radarRef.current) return;
+    
+    // Clear previous chart
+    d3.select(radarRef.current).selectAll('*').remove();
+    
+    // Chart dimensions
+    const width = 600;
+    const height = 500;
+    const margin = { top: 50, right: 50, bottom: 50, left: 50 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    const radius = Math.min(chartWidth, chartHeight) / 2;
+    
+    // Create SVG
+    const svg = d3.select(radarRef.current)
+      .append('svg')
+      .attr('width', width)
+      .attr('height', height)
+      .append('g')
+      .attr('transform', `translate(${width / 2},${height / 2})`);
+    
+    // Prepare data
+    const dimensions = data.dimensions;
+    const numDimensions = dimensions.length;
+    const angleSlice = (Math.PI * 2) / numDimensions;
+    
+    // Scale for the radius
+    const rScale = d3.scaleLinear()
+      .domain([0, 1])
+      .range([0, radius]);
+    
+    // Draw the circular grid
+    const axisGrid = svg.append('g').attr('class', 'axis-grid');
+    
+    // Draw the background circles
+    const circles = [0.2, 0.4, 0.6, 0.8, 1];
+    
+    axisGrid.selectAll('.grid-circle')
+      .data(circles)
+      .enter()
+      .append('circle')
+      .attr('class', 'grid-circle')
+      .attr('r', d => rScale(d))
+      .attr('fill', 'none')
+      .attr('stroke', '#ddd')
+      .attr('stroke-dasharray', '4,4');
+    
+    // Add labels for the circles
+    axisGrid.selectAll('.grid-label')
+      .data(circles)
+      .enter()
+      .append('text')
+      .attr('class', 'grid-label')
+      .attr('x', 5)
+      .attr('y', d => -rScale(d))
+      .attr('text-anchor', 'middle')
+      .style('font-size', '10px')
+      .style('fill', '#666')
+      .text(d => d * 100 + '%');
+    
+    // Draw the axes
+    const axes = axisGrid.selectAll('.axis')
+      .data(dimensions)
+      .enter()
+      .append('g')
+      .attr('class', 'axis');
+    
+    // Draw the lines
+    axes.append('line')
+      .attr('x1', 0)
+      .attr('y1', 0)
+      .attr('x2', (d, i) => rScale(1.1) * Math.cos(angleSlice * i - Math.PI / 2))
+      .attr('y2', (d, i) => rScale(1.1) * Math.sin(angleSlice * i - Math.PI / 2))
+      .attr('stroke', '#ddd')
+      .attr('stroke-width', 1);
+    
+    // Draw the axis labels
+    axes.append('text')
+      .attr('class', 'axis-label')
+      .attr('x', (d, i) => rScale(1.15) * Math.cos(angleSlice * i - Math.PI / 2))
+      .attr('y', (d, i) => rScale(1.15) * Math.sin(angleSlice * i - Math.PI / 2))
+      .attr('text-anchor', (d, i) => {
+        const x = Math.cos(angleSlice * i - Math.PI / 2);
+        if (Math.abs(x) < 0.1) return 'middle';
+        return x > 0 ? 'start' : 'end';
+      })
+      .attr('dy', (d, i) => {
+        const y = Math.sin(angleSlice * i - Math.PI / 2);
+        if (Math.abs(y) < 0.1) return y > 0 ? '1em' : '-0.5em';
+        return '0.35em';
+      })
+      .style('font-size', '12px')
+      .style('fill', '#333')
+      .text(d => d.name);
+    
+    // Draw the radar chart areas
+    const radarLine = d3.lineRadial()
+      .radius(d => rScale(d.value))
+      .angle((d, i) => i * angleSlice)
+      .curve(d3.curveLinearClosed);
+    
+    // Create a wrapper for the data points
+    const radarWrapper = svg.append('g')
+      .attr('class', 'radar-wrapper');
+    
+    // Draw the radar area
+    radarWrapper.append('path')
+      .datum(dimensions)
+      .attr('class', 'radar-area')
+      .attr('d', radarLine)
+      .attr('fill', '#3498db')
+      .attr('fill-opacity', 0.5)
+      .attr('stroke', '#2980b9')
+      .attr('stroke-width', 2);
+    
+    // Draw the radar points
+    radarWrapper.selectAll('.radar-point')
+      .data(dimensions)
+      .enter()
+      .append('circle')
+      .attr('class', 'radar-point')
+      .attr('r', 5)
+      .attr('cx', (d, i) => rScale(d.value) * Math.cos(angleSlice * i - Math.PI / 2))
+      .attr('cy', (d, i) => rScale(d.value) * Math.sin(angleSlice * i - Math.PI / 2))
+      .attr('fill', '#fff')
+      .attr('stroke', '#2980b9')
+      .attr('stroke-width', 2)
+      .on('mouseover', function(event, d) {
+        // Highlight point
+        d3.select(this)
+          .attr('r', 8);
+        
+        // Show tooltip
+        const tooltip = svg.append('g')
+          .attr('class', 'tooltip')
+          .attr('transform', `translate(${rScale(d.value) * Math.cos(angleSlice * dimensions.indexOf(d) - Math.PI / 2)}, ${rScale(d.value) * Math.sin(angleSlice * dimensions.indexOf(d) - Math.PI / 2)})`);
+        
+        tooltip.append('rect')
+          .attr('x', 10)
+          .attr('y', -30)
+          .attr('width', 180)
+          .attr('height', 60)
+          .attr('fill', '#f8f9fa')
+          .attr('stroke', '#343a40')
+          .attr('rx', 5)
+          .attr('ry', 5);
+        
+        tooltip.append('text')
+          .attr('x', 20)
+          .attr('y', -10)
+          .style('font-size', '12px')
+          .style('font-weight', 'bold')
+          .text(d.name);
+        
+        tooltip.append('text')
+          .attr('x', 20)
+          .attr('y', 10)
+          .style('font-size', '12px')
+          .text(`Score: ${(d.value * 100).toFixed(1)}%`);
+        
+        tooltip.append('text')
+          .attr('x', 20)
+          .attr('y', 30)
+          .style('font-size', '12px')
+          .text(d.description || '');
+      })
+      .on('mouseout', function() {
+        // Remove highlight
+        d3.select(this)
+          .attr('r', 5);
+        
+        // Remove tooltip
+        svg.selectAll('.tooltip').remove();
+      });
+    
+    // Add title
+    svg.append('text')
+      .attr('x', 0)
+      .attr('y', -height / 2 + margin.top / 2)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '16px')
+      .style('font-weight', 'bold')
+      .text('Policy Effectiveness Prediction');
+    
+    // Add legend for overall score
+    const legend = svg.append('g')
+      .attr('class', 'legend')
+      .attr('transform', `translate(${-radius}, ${-radius})`);
+    
+    legend.append('rect')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', 120)
+      .attr('height', 60)
+      .attr('fill', '#f8f9fa')
+      .attr('stroke', '#343a40')
+      .attr('rx', 5)
+      .attr('ry', 5);
+    
+    legend.append('text')
+      .attr('x', 10)
+      .attr('y', 20)
+      .style('font-size', '12px')
+      .style('font-weight', 'bold')
+      .text('Overall Score');
+    
+    legend.append('text')
+      .attr('x', 10)
+      .attr('y', 40)
+      .style('font-size', '14px')
+      .style('fill', data.overallScore >= 0.7 ? '#27ae60' : data.overallScore >= 0.4 ? '#f39c12' : '#e74c3c')
+      .text(`${(data.overallScore * 100).toFixed(1)}%`);
+    
+  }, [data]);
+  
+  return (
+    <Card elevation={3} sx={{ mb: 4 }}>
+      <CardHeader title="Policy Effectiveness Prediction" />
+      <CardContent>
+        <div ref={radarRef} style={{ width: '100%', height: '500px' }} />
+        {data && (
+          <Box mt={2}>
+            <Typography variant="h6">Key Findings</Typography>
+            <Typography variant="body1">
+              Overall Effectiveness Score: {(data.overallScore * 100).toFixed(1)}%
+              {data.overallScore >= 0.7 ? ' (High)' : data.overallScore >= 0.4 ? ' (Medium)' : ' (Low)'}
+            </Typography>
+            <Typography variant="body1">
+              Strongest Dimension: {data.strongestDimension?.name || 'N/A'} ({(data.strongestDimension?.value * 100).toFixed(1)}%)
+            </Typography>
+            <Typography variant="body1">
+              Weakest Dimension: {data.weakestDimension?.name || 'N/A'} ({(data.weakestDimension?.value * 100).toFixed(1)}%)
+            </Typography>
+            <Typography variant="body1">
+              Recommendation: {data.recommendation || 'N/A'}
+            </Typography>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default PolicyEffectivenessRadar;
+Now I'll provide the main wizard component that guides users through the RIA process:
+javascript
+// frontend/src/components/RiaWizard.jsx
+// Main wizard component for the RIA tool
+
+import React, { useState } from 'react';
+import { 
+  Stepper, 
+  Step, 
+  StepLabel, 
+  Button, 
+  Typography, 
+  Box, 
+  Paper,
+  Container,
+  Grid
+} from '@mui/material';
+import ProjectInfoForm from './steps/ProjectInfoForm';
+import RegulatoryContextForm from './steps/RegulatoryContextForm';
+import DocumentUploadForm from './steps/DocumentUploadForm';
+import StakeholderAnalysisForm from './steps/StakeholderAnalysisForm';
+import ImpactAssessmentForm from './steps/ImpactAssessmentForm';
+import CostBenefitAnalysisForm from './steps/CostBenefitAnalysisForm';
+import ReportGenerationForm from './steps/ReportGenerationForm';
+
+const steps = [
+  'Project Information',
+  'Regulatory Context',
+  'Document Upload',
+  'Stakeholder Analysis',
+  'Impact Assessment',
+  'Cost-Benefit Analysis',
+  'Report Generation'
+];
+
+const RiaWizard = () => {
+  const [activeStep, setActiveStep] = useState(0);
+  const [formData, setFormData] = useState({
+    projectInfo: {},
+    regulatoryContext: {},
+    documents: { uploadedDocuments: [] },
+    stakeholders: { identifiedStakeholders: [] },
+    impacts: {
+      economicImpacts: [],
+      socialImpacts: [],
+      environmentalImpacts: [],
+      governanceImpacts: []
+    },
+    costBenefit: {
+      costs: [],
+      benefits: [],
+      monetaryValues: {}
+    },
+    report: {}
+  });
+  const [completed, setCompleted] = useState({});
+
+  const handleNext = () => {
+    setActiveStep((prevActiveStep) => prevActiveStep + 1);
+  };
+
+  const handleBack = () => {
+    setActiveStep((prevActiveStep) => prevActiveStep - 1);
+  };
+
+  const handleComplete = (stepData) => {
+    const newCompleted = { ...completed };
+    newCompleted[activeStep] = true;
+    setCompleted(newCompleted);
+    
+    // Update form data
+    const newFormData = { ...formData };
+    switch (activeStep) {
+      case 0:
+        newFormData.projectInfo = stepData;
+        break;
+      case 1:
+        newFormData.regulatoryContext = stepData;
+        break;
+      case 2:
+        newFormData.documents = stepData;
+        break;
+      case 3:
+        newFormData.stakeholders = stepData;
+        break;
+      case 4:
+        newFormData.impacts = stepData;
+        break;
+      case 5:
+        newFormData.costBenefit = stepData;
+        break;
+      case 6:
+        newFormData.report = stepData;
+        break;
+      default:
+        break;
+    }
+    setFormData(newFormData);
+    
+    // Move to next step if not the last step
+    if (activeStep !== steps.length - 1) {
+      handleNext();
+    }
+  };
+
+  const getStepContent = (step) => {
+    switch (step) {
+      case 0:
+        return <ProjectInfoForm onComplete={handleComplete} initialData={formData.projectInfo} />;
+      case 1:
+        return <RegulatoryContextForm onComplete={handleComplete} initialData={formData.regulatoryContext} />;
+      case 2:
+        return <DocumentUploadForm onComplete={handleComplete} initialData={formData.documents} />;
+      case 3:
+        return <StakeholderAnalysisForm onComplete={handleComplete} initialData={formData.stakeholders} />;
+      case 4:
+        return <ImpactAssessmentForm onComplete={handleComplete} initialData={formData.impacts} />;
+      case 5:
+        return <CostBenefitAnalysisForm onComplete={handleComplete} initialData={formData.costBenefit} />;
+      case 6:
+        return <ReportGenerationForm onComplete={handleComplete} initialData={formData.report} formData={formData} />;
+      default:
+        return 'Unknown step';
+    }
+  };
+
+  return (
+    <Container maxWidth="lg">
+      <Paper elevation={3} sx={{ p: 4, mt: 4, mb: 4 }}>
+        <Typography variant="h4" component="h1" align="center" gutterBottom>
+          Regulatory Impact Assessment Tool
+        </Typography>
+        
+        <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
+          {steps.map((label, index) => {
+            const stepProps = {};
+            const labelProps = {};
+            
+            return (
+              <Step key={label} {...stepProps} completed={completed[index]}>
+                <StepLabel {...labelProps}>{label}</StepLabel>
+              </Step>
+            );
+          })}
+        </Stepper>
+        
+        <Box sx={{ mt: 2, mb: 2 }}>
+          {getStepContent(activeStep)}
+        </Box>
+        
+        <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
+          <Button
+            color="inherit"
+            disabled={activeStep === 0}
+            onClick={handleBack}
+            sx={{ mr: 1 }}
+          >
+            Back
+          </Button>
+          <Box sx={{ flex: '1 1 auto' }} />
+          {activeStep !== steps.length - 1 && (
+            <Button 
+              variant="contained" 
+              color="primary"
+              onClick={() => {
+                document.getElementById('step-form-submit')?.click();
+              }}
+            >
+              {activeStep === steps.length - 1 ? 'Finish' : 'Save & Continue'}
+            </Button>
+          )}
+        </Box>
+      </Paper>
+    </Container>
+  );
+};
+
+export default RiaWizard;
