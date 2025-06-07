@@ -1,0 +1,336 @@
+import React, { useEffect, useRef } from 'react';
+import * as d3 from 'd3';
+import { Card, CardHeader, CardContent, Typography } from '@mui/material';
+
+const CostBenefitChart = ({ data, timeframe = 5 }) => {
+  const chartRef = useRef(null);
+  
+  useEffect(() => {
+    if (!data || !chartRef.current) return;
+    
+    // Clear previous chart
+    d3.select(chartRef.current).selectAll('*').remove();
+    
+    // Chart dimensions
+    const margin = { top: 40, right: 80, bottom: 60, left: 80 };
+    const width = 800 - margin.left - margin.right;
+    const height = 500 - margin.top - margin.bottom;
+    
+    // Create SVG
+    const svg = d3.select(chartRef.current)
+      .append('svg')
+      .attr('width', width + margin.left + margin.right)
+      .attr('height', height + margin.top + margin.bottom)
+      .append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
+    
+    // Prepare data
+    const years = Array.from({ length: timeframe }, (_, i) => i + 1);
+    
+    const costsData = years.map(year => ({
+      year,
+      value: data.costs.reduce((sum, cost) => {
+        const yearlyValue = cost.isRecurring ? cost.value : (year === 1 ? cost.value : 0);
+        return sum + yearlyValue;
+      }, 0)
+    }));
+    
+    const benefitsData = years.map(year => ({
+      year,
+      value: data.benefits.reduce((sum, benefit) => {
+        // Apply ramp-up factor for benefits (benefits often increase over time)
+        const rampUpFactor = Math.min(1, year / 3); // Full benefits after 3 years
+        const yearlyValue = benefit.isRecurring ? benefit.value * rampUpFactor : (year === 1 ? benefit.value : 0);
+        return sum + yearlyValue;
+      }, 0)
+    }));
+    
+    const cumulativeCostsData = years.map((year, i) => ({
+      year,
+      value: costsData.slice(0, i + 1).reduce((sum, d) => sum + d.value, 0)
+    }));
+    
+    const cumulativeBenefitsData = years.map((year, i) => ({
+      year,
+      value: benefitsData.slice(0, i + 1).reduce((sum, d) => sum + d.value, 0)
+    }));
+    
+    // Scales
+    const xScale = d3.scaleBand()
+      .domain(years)
+      .range([0, width])
+      .padding(0.2);
+    
+    const yScale = d3.scaleLinear()
+      .domain([0, d3.max([...costsData, ...benefitsData], d => d.value) * 1.2])
+      .range([height, 0]);
+    
+    // Axes
+    const xAxis = d3.axisBottom(xScale)
+      .tickFormat(d => `Year ${d}`);
+    
+    const yAxis = d3.axisLeft(yScale)
+      .tickFormat(d => `$${d3.format(',')(d)}`);
+    
+    svg.append('g')
+      .attr('transform', `translate(0,${height})`)
+      .call(xAxis)
+      .selectAll('text')
+      .style('font-size', '12px');
+    
+    svg.append('g')
+      .call(yAxis)
+      .selectAll('text')
+      .style('font-size', '12px');
+    
+    // X-axis label
+    svg.append('text')
+      .attr('transform', `translate(${width / 2}, ${height + margin.bottom - 10})`)
+      .style('text-anchor', 'middle')
+      .style('font-size', '14px')
+      .text('Year');
+    
+    // Y-axis label
+    svg.append('text')
+      .attr('transform', 'rotate(-90)')
+      .attr('y', -margin.left + 20)
+      .attr('x', -(height / 2))
+      .attr('dy', '1em')
+      .style('text-anchor', 'middle')
+      .style('font-size', '14px')
+      .text('Value ($)');
+    
+    // Title
+    svg.append('text')
+      .attr('x', width / 2)
+      .attr('y', -margin.top / 2)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '16px')
+      .style('font-weight', 'bold')
+      .text('Cost-Benefit Analysis');
+    
+    // Draw bars for costs
+    svg.selectAll('.cost-bar')
+      .data(costsData)
+      .enter()
+      .append('rect')
+      .attr('class', 'cost-bar')
+      .attr('x', d => xScale(d.year))
+      .attr('y', d => yScale(d.value))
+      .attr('width', xScale.bandwidth() / 2)
+      .attr('height', d => height - yScale(d.value))
+      .attr('fill', '#e74c3c')
+      .attr('opacity', 0.7)
+      .on('mouseover', function(event, d) {
+        d3.select(this).attr('opacity', 1);
+        
+        svg.append('text')
+          .attr('class', 'tooltip')
+          .attr('x', xScale(d.year) + xScale.bandwidth() / 4)
+          .attr('y', yScale(d.value) - 10)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '12px')
+          .text(`$${d3.format(',')(d.value)}`);
+      })
+      .on('mouseout', function() {
+        d3.select(this).attr('opacity', 0.7);
+        svg.selectAll('.tooltip').remove();
+      });
+    
+    // Draw bars for benefits
+    svg.selectAll('.benefit-bar')
+      .data(benefitsData)
+      .enter()
+      .append('rect')
+      .attr('class', 'benefit-bar')
+      .attr('x', d => xScale(d.year) + xScale.bandwidth() / 2)
+      .attr('y', d => yScale(d.value))
+      .attr('width', xScale.bandwidth() / 2)
+      .attr('height', d => height - yScale(d.value))
+      .attr('fill', '#2ecc71')
+      .attr('opacity', 0.7)
+      .on('mouseover', function(event, d) {
+        d3.select(this).attr('opacity', 1);
+        
+        svg.append('text')
+          .attr('class', 'tooltip')
+          .attr('x', xScale(d.year) + 3 * xScale.bandwidth() / 4)
+          .attr('y', yScale(d.value) - 10)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '12px')
+          .text(`$${d3.format(',')(d.value)}`);
+      })
+      .on('mouseout', function() {
+        d3.select(this).attr('opacity', 0.7);
+        svg.selectAll('.tooltip').remove();
+      });
+    
+    // Draw lines for cumulative values
+    const costLine = d3.line()
+      .x(d => xScale(d.year) + xScale.bandwidth() / 4)
+      .y(d => yScale(d.value));
+    
+    const benefitLine = d3.line()
+      .x(d => xScale(d.year) + 3 * xScale.bandwidth() / 4)
+      .y(d => yScale(d.value));
+    
+    svg.append('path')
+      .datum(cumulativeCostsData)
+      .attr('fill', 'none')
+      .attr('stroke', '#c0392b')
+      .attr('stroke-width', 2)
+      .attr('d', costLine);
+    
+    svg.append('path')
+      .datum(cumulativeBenefitsData)
+      .attr('fill', 'none')
+      .attr('stroke', '#27ae60')
+      .attr('stroke-width', 2)
+      .attr('d', benefitLine);
+    
+    // Add circles for cumulative data points
+    svg.selectAll('.cost-point')
+      .data(cumulativeCostsData)
+      .enter()
+      .append('circle')
+      .attr('class', 'cost-point')
+      .attr('cx', d => xScale(d.year) + xScale.bandwidth() / 4)
+      .attr('cy', d => yScale(d.value))
+      .attr('r', 4)
+      .attr('fill', '#c0392b')
+      .on('mouseover', function(event, d) {
+        d3.select(this).attr('r', 6);
+        
+        svg.append('text')
+          .attr('class', 'tooltip')
+          .attr('x', xScale(d.year) + xScale.bandwidth() / 4)
+          .attr('y', yScale(d.value) - 15)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '12px')
+          .text(`Cumulative: $${d3.format(',')(d.value)}`);
+      })
+      .on('mouseout', function() {
+        d3.select(this).attr('r', 4);
+        svg.selectAll('.tooltip').remove();
+      });
+    
+    svg.selectAll('.benefit-point')
+      .data(cumulativeBenefitsData)
+      .enter()
+      .append('circle')
+      .attr('class', 'benefit-point')
+      .attr('cx', d => xScale(d.year) + 3 * xScale.bandwidth() / 4)
+      .attr('cy', d => yScale(d.value))
+      .attr('r', 4)
+      .attr('fill', '#27ae60')
+      .on('mouseover', function(event, d) {
+        d3.select(this).attr('r', 6);
+        
+        svg.append('text')
+          .attr('class', 'tooltip')
+          .attr('x', xScale(d.year) + 3 * xScale.bandwidth() / 4)
+          .attr('y', yScale(d.value) - 15)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '12px')
+          .text(`Cumulative: $${d3.format(',')(d.value)}`);
+      })
+      .on('mouseout', function() {
+        d3.select(this).attr('r', 4);
+        svg.selectAll('.tooltip').remove();
+      });
+    
+    // Add legend
+    const legend = svg.append('g')
+      .attr('transform', `translate(${width - 120}, 0)`);
+    
+    // Costs
+    legend.append('rect')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', 15)
+      .attr('height', 15)
+      .attr('fill', '#e74c3c');
+    
+    legend.append('text')
+      .attr('x', 20)
+      .attr('y', 12.5)
+      .style('font-size', '12px')
+      .text('Costs');
+    
+    // Benefits
+    legend.append('rect')
+      .attr('x', 0)
+      .attr('y', 25)
+      .attr('width', 15)
+      .attr('height', 15)
+      .attr('fill', '#2ecc71');
+    
+    legend.append('text')
+      .attr('x', 20)
+      .attr('y', 37.5)
+      .style('font-size', '12px')
+      .text('Benefits');
+    
+    // Cumulative costs
+    legend.append('line')
+      .attr('x1', 0)
+      .attr('y1', 50)
+      .attr('x2', 15)
+      .attr('y2', 50)
+      .attr('stroke', '#c0392b')
+      .attr('stroke-width', 2);
+    
+    legend.append('text')
+      .attr('x', 20)
+      .attr('y', 52.5)
+      .style('font-size', '12px')
+      .text('Cumulative Costs');
+    
+    // Cumulative benefits
+    legend.append('line')
+      .attr('x1', 0)
+      .attr('y1', 75)
+      .attr('x2', 15)
+      .attr('y2', 75)
+      .attr('stroke', '#27ae60')
+      .attr('stroke-width', 2);
+    
+    legend.append('text')
+      .attr('x', 20)
+      .attr('y', 77.5)
+      .style('font-size', '12px')
+      .text('Cumulative Benefits');
+    
+  }, [data, timeframe]);
+  
+  return (
+    <Card elevation={3} sx={{ mb: 4 }}>
+      <CardHeader title="Cost-Benefit Analysis" />
+      <CardContent>
+        <div ref={chartRef} style={{ width: '100%', height: '500px' }} />
+        {data && (
+          <div style={{ marginTop: '20px' }}>
+            <Typography variant="h6">Summary</Typography>
+            <Typography variant="body1">
+              Total Costs: ${data.totalCosts.toLocaleString()}
+            </Typography>
+            <Typography variant="body1">
+              Total Benefits: ${data.totalBenefits.toLocaleString()}
+            </Typography>
+            <Typography variant="body1">
+              Net Present Value: ${data.netPresentValue.toLocaleString()}
+            </Typography>
+            <Typography variant="body1">
+              Benefit-Cost Ratio: {data.benefitCostRatio.toFixed(2)}
+            </Typography>
+            <Typography variant="body1" color={data.economicallyJustified ? 'success.main' : 'error.main'}>
+              Economically Justified: {data.economicallyJustified ? 'Yes' : 'No'}
+            </Typography>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default CostBenefitChart;
