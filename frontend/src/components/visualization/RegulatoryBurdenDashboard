@@ -1,0 +1,365 @@
+import React, { useEffect, useRef } from 'react';
+import * as d3 from 'd3';
+import { Card, CardHeader, CardContent, Typography, Grid, Box } from '@mui/material';
+
+const RegulatoryBurdenDashboard = ({ data }) => {
+  const pieChartRef = useRef(null);
+  const barChartRef = useRef(null);
+  
+  useEffect(() => {
+    if (!data || !data.burdenCategories || !pieChartRef.current || !barChartRef.current) return;
+    
+    // Clear previous charts
+    d3.select(pieChartRef.current).selectAll('*').remove();
+    d3.select(barChartRef.current).selectAll('*').remove();
+    
+    // Create pie chart for burden distribution
+    createPieChart();
+    
+    // Create bar chart for stakeholder burden
+    createBarChart();
+    
+    function createPieChart() {
+      // Chart dimensions
+      const width = 400;
+      const height = 400;
+      const radius = Math.min(width, height) / 2;
+      
+      // Create SVG
+      const svg = d3.select(pieChartRef.current)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .append('g')
+        .attr('transform', `translate(${width / 2},${height / 2})`);
+      
+      // Prepare data
+      const burdenCategories = data.burdenCategories;
+      
+      // Color scale
+      const colorScale = d3.scaleOrdinal()
+        .domain(burdenCategories.map(d => d.id))
+        .range(d3.schemeCategory10);
+      
+      // Create pie chart
+      const pie = d3.pie()
+        .value(d => d.value)
+        .sort(null);
+      
+      const arc = d3.arc()
+        .innerRadius(radius * 0.4) // Create a donut chart
+        .outerRadius(radius * 0.8);
+      
+      const outerArc = d3.arc()
+        .innerRadius(radius * 0.9)
+        .outerRadius(radius * 0.9);
+      
+      // Draw pie segments
+      const arcs = svg.selectAll('.arc')
+        .data(pie(burdenCategories))
+        .enter()
+        .append('g')
+        .attr('class', 'arc');
+      
+      arcs.append('path')
+        .attr('d', arc)
+        .attr('fill', d => colorScale(d.data.id))
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 2)
+        .on('mouseover', function(event, d) {
+          // Highlight segment
+          d3.select(this)
+            .attr('opacity', 0.8);
+          
+          // Show tooltip
+          const tooltip = svg.append('g')
+            .attr('class', 'tooltip');
+          
+          tooltip.append('rect')
+            .attr('x', -100)
+            .attr('y', -30)
+            .attr('width', 200)
+            .attr('height', 60)
+            .attr('fill', '#f8f9fa')
+            .attr('stroke', '#343a40')
+            .attr('rx', 5)
+            .attr('ry', 5);
+          
+          tooltip.append('text')
+            .attr('x', 0)
+            .attr('y', -10)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '14px')
+            .style('font-weight', 'bold')
+            .text(d.data.name);
+          
+          tooltip.append('text')
+            .attr('x', 0)
+            .attr('y', 15)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '14px')
+            .text(`$${d3.format(',')(d.data.value)} (${(d.data.value / d3.sum(burdenCategories, d => d.value) * 100).toFixed(1)}%)`);
+        })
+        .on('mouseout', function() {
+          // Remove highlight
+          d3.select(this)
+            .attr('opacity', 1);
+          
+          // Remove tooltip
+          svg.selectAll('.tooltip').remove();
+        });
+      
+      // Add labels
+      const labelArc = d3.arc()
+        .innerRadius(radius * 0.85)
+        .outerRadius(radius * 0.85);
+      
+      // Add polylines for labels
+      function midAngle(d) {
+        return d.startAngle + (d.endAngle - d.startAngle) / 2;
+      }
+      
+      arcs.append('polyline')
+        .attr('points', function(d) {
+          const pos = outerArc.centroid(d);
+          pos[0] = radius * 0.95 * (midAngle(d) < Math.PI ? 1 : -1);
+          return [arc.centroid(d), outerArc.centroid(d), pos];
+        })
+        .attr('stroke', '#333')
+        .attr('fill', 'none')
+        .attr('stroke-width', 1);
+      
+      arcs.append('text')
+        .attr('transform', function(d) {
+          const pos = outerArc.centroid(d);
+          pos[0] = radius * 0.98 * (midAngle(d) < Math.PI ? 1 : -1);
+          return `translate(${pos})`;
+        })
+        .attr('text-anchor', d => midAngle(d) < Math.PI ? 'start' : 'end')
+        .style('font-size', '12px')
+        .text(d => d.data.name);
+      
+      // Add center text
+      svg.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('dy', '-0.5em')
+        .style('font-size', '16px')
+        .style('font-weight', 'bold')
+        .text('Total Burden');
+      
+      svg.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('dy', '1em')
+        .style('font-size', '16px')
+        .text(`$${d3.format(',')(d3.sum(burdenCategories, d => d.value))}`);
+    }
+    
+    function createBarChart() {
+      // Chart dimensions
+      const margin = { top: 40, right: 20, bottom: 120, left: 80 };
+      const width = 600 - margin.left - margin.right;
+      const height = 400 - margin.top - margin.bottom;
+      
+      // Create SVG
+      const svg = d3.select(barChartRef.current)
+        .append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+      
+      // Prepare data
+      const stakeholderBurden = data.stakeholderBurden;
+      
+      // Create scales
+      const xScale = d3.scaleBand()
+        .domain(stakeholderBurden.map(d => d.stakeholderId))
+        .range([0, width])
+        .padding(0.2);
+      
+      const yScale = d3.scaleLinear()
+        .domain([0, d3.max(stakeholderBurden, d => d.totalBurden) * 1.1])
+        .range([height, 0]);
+      
+      // Create axes
+      const xAxis = d3.axisBottom(xScale)
+        .tickFormat(d => {
+          const stakeholder = data.stakeholders.find(s => s.id === d);
+          return stakeholder ? stakeholder.name : '';
+        });
+      
+      const yAxis = d3.axisLeft(yScale)
+        .tickFormat(d => `$${d3.format(',')(d)}`);
+      
+      svg.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(xAxis)
+        .selectAll('text')
+        .attr('transform', 'rotate(-45)')
+        .style('text-anchor', 'end')
+        .attr('dx', '-.8em')
+        .attr('dy', '.15em')
+        .style('font-size', '12px');
+      
+      svg.append('g')
+        .call(yAxis)
+        .selectAll('text')
+        .style('font-size', '12px');
+      
+      // Add title
+      svg.append('text')
+        .attr('x', width / 2)
+        .attr('y', -margin.top / 2)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '16px')
+        .style('font-weight', 'bold')
+        .text('Regulatory Burden by Stakeholder');
+      
+      // Create stacked data
+      const stackedData = d3.stack()
+        .keys(data.burdenCategories.map(d => d.id))
+        .value((obj, key) => {
+          const categoryBurden = obj.burdenByCategory.find(item => item.categoryId === key);
+          return categoryBurden ? categoryBurden.value : 0;
+        })(stakeholderBurden);
+      
+      // Color scale
+      const colorScale = d3.scaleOrdinal()
+        .domain(data.burdenCategories.map(d => d.id))
+        .range(d3.schemeCategory10);
+      
+      // Draw stacked bars
+      svg.append('g')
+        .selectAll('g')
+        .data(stackedData)
+        .enter()
+        .append('g')
+        .attr('fill', d => colorScale(d.key))
+        .selectAll('rect')
+        .data(d => d)
+        .enter()
+        .append('rect')
+        .attr('x', d => xScale(d.data.stakeholderId))
+        .attr('y', d => yScale(d[1]))
+        .attr('height', d => yScale(d[0]) - yScale(d[1]))
+        .attr('width', xScale.bandwidth())
+        .on('mouseover', function(event, d) {
+          // Highlight bar
+          d3.select(this)
+            .attr('opacity', 0.8);
+          
+          // Get category and stakeholder
+          const categoryId = d3.select(this.parentNode).datum().key;
+          const category = data.burdenCategories.find(c => c.id === categoryId);
+          const stakeholder = data.stakeholders.find(s => s.id === d.data.stakeholderId);
+          
+          // Get value
+          const categoryBurden = d.data.burdenByCategory.find(item => item.categoryId === categoryId);
+          const value = categoryBurden ? categoryBurden.value : 0;
+          
+          // Show tooltip
+          const tooltip = svg.append('g')
+            .attr('class', 'tooltip')
+            .attr('transform', `translate(${xScale(d.data.stakeholderId) + xScale.bandwidth() / 2}, ${yScale(d[1]) - 10})`);
+          
+          tooltip.append('rect')
+            .attr('x', -100)
+            .attr('y', -60)
+            .attr('width', 200)
+            .attr('height', 60)
+            .attr('fill', '#f8f9fa')
+            .attr('stroke', '#343a40')
+            .attr('rx', 5)
+            .attr('ry', 5);
+          
+          tooltip.append('text')
+            .attr('x', 0)
+            .attr('y', -40)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '12px')
+            .style('font-weight', 'bold')
+            .text(stakeholder ? stakeholder.name : '');
+          
+          tooltip.append('text')
+            .attr('x', 0)
+            .attr('y', -20)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '12px')
+            .text(category ? category.name : '');
+          
+          tooltip.append('text')
+            .attr('x', 0)
+            .attr('y', 0)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '12px')
+            .text(`$${d3.format(',')(value)}`);
+        })
+        .on('mouseout', function() {
+          // Remove highlight
+          d3.select(this)
+            .attr('opacity', 1);
+          
+          // Remove tooltip
+          svg.selectAll('.tooltip').remove();
+        });
+      
+      // Add legend
+      const legend = svg.append('g')
+        .attr('transform', `translate(0, ${height + margin.bottom - 50})`);
+      
+      const legendItems = legend.selectAll('.legend-item')
+        .data(data.burdenCategories)
+        .enter()
+        .append('g')
+        .attr('class', 'legend-item')
+        .attr('transform', (d, i) => `translate(${i * (width / data.burdenCategories.length)}, 0)`);
+      
+      legendItems.append('rect')
+        .attr('width', 15)
+        .attr('height', 15)
+        .attr('fill', d => colorScale(d.id));
+      
+      legendItems.append('text')
+        .attr('x', 20)
+        .attr('y', 12.5)
+        .style('font-size', '10px')
+        .text(d => d.name);
+    }
+    
+  }, [data]);
+  
+  return (
+    <Card elevation={3} sx={{ mb: 4 }}>
+      <CardHeader title="Regulatory Burden Analysis" />
+      <CardContent>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <div ref={pieChartRef} style={{ width: '100%', height: '400px' }} />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <div ref={barChartRef} style={{ width: '100%', height: '400px' }} />
+          </Grid>
+        </Grid>
+        {data && (
+          <Box mt={2}>
+            <Typography variant="h6">Key Findings</Typography>
+            <Typography variant="body1">
+              Total Regulatory Burden: ${data.totalBurden.toLocaleString()}
+            </Typography>
+            <Typography variant="body1">
+              Administrative Burden: ${data.administrativeBurden.toLocaleString()} ({(data.administrativeBurden / data.totalBurden * 100).toFixed(1)}%)
+            </Typography>
+            <Typography variant="body1">
+              Compliance Burden: ${data.complianceBurden.toLocaleString()} ({(data.complianceBurden / data.totalBurden * 100).toFixed(1)}%)
+            </Typography>
+            <Typography variant="body1">
+              Most Affected Stakeholder: {data.mostAffectedStakeholder?.name || 'N/A'} (${data.mostAffectedStakeholder?.burden.toLocaleString() || 0})
+            </Typography>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default RegulatoryBurdenDashboard;
