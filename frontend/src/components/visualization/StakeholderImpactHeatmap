@@ -1,0 +1,219 @@
+import React, { useEffect, useRef } from 'react';
+import * as d3 from 'd3';
+import { Card, CardHeader, CardContent, Typography, Box } from '@mui/material';
+
+const StakeholderImpactHeatmap = ({ data }) => {
+  const heatmapRef = useRef(null);
+  
+  useEffect(() => {
+    if (!data || !data.stakeholders || !data.impactTypes || !heatmapRef.current) return;
+    
+    // Clear previous chart
+    d3.select(heatmapRef.current).selectAll('*').remove();
+    
+    // Chart dimensions
+    const margin = { top: 50, right: 50, bottom: 100, left: 150 };
+    const width = 800 - margin.left - margin.right;
+    const height = 500 - margin.top - margin.bottom;
+    
+    // Create SVG
+    const svg = d3.select(heatmapRef.current)
+      .append('svg')
+      .attr('width', width + margin.left + margin.right)
+      .attr('height', height + margin.top + margin.bottom)
+      .append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
+    
+    // Prepare data
+    const stakeholders = data.stakeholders;
+    const impactTypes = data.impactTypes;
+    
+    // Create scales
+    const xScale = d3.scaleBand()
+      .domain(impactTypes.map(d => d.id))
+      .range([0, width])
+      .padding(0.05);
+    
+    const yScale = d3.scaleBand()
+      .domain(stakeholders.map(d => d.id))
+      .range([0, height])
+      .padding(0.05);
+    
+    // Color scale for impact intensity
+    const colorScale = d3.scaleSequential()
+      .interpolator(d3.interpolateRdYlGn)
+      .domain([-1, 1]); // -1 = negative impact, 0 = neutral, 1 = positive impact
+    
+    // Create the heatmap cells
+    svg.selectAll('.impact-cell')
+      .data(data.impacts)
+      .enter()
+      .append('rect')
+      .attr('class', 'impact-cell')
+      .attr('x', d => xScale(d.impactTypeId))
+      .attr('y', d => yScale(d.stakeholderId))
+      .attr('width', xScale.bandwidth())
+      .attr('height', yScale.bandwidth())
+      .attr('fill', d => colorScale(d.value))
+      .attr('stroke', '#fff')
+      .attr('stroke-width', 1)
+      .on('mouseover', function(event, d) {
+        // Highlight cell
+        d3.select(this)
+          .attr('stroke', '#000')
+          .attr('stroke-width', 2);
+        
+        // Show tooltip
+        const stakeholder = stakeholders.find(s => s.id === d.stakeholderId);
+        const impactType = impactTypes.find(i => i.id === d.impactTypeId);
+        
+        const tooltip = svg.append('g')
+          .attr('class', 'tooltip')
+          .attr('transform', `translate(${xScale(d.impactTypeId) + xScale.bandwidth() / 2}, ${yScale(d.stakeholderId) + yScale.bandwidth() / 2})`);
+        
+        const tooltipRect = tooltip.append('rect')
+          .attr('x', 10)
+          .attr('y', -35)
+          .attr('width', 220)
+          .attr('height', 70)
+          .attr('fill', '#f8f9fa')
+          .attr('stroke', '#343a40')
+          .attr('rx', 5)
+          .attr('ry', 5);
+        
+        tooltip.append('text')
+          .attr('x', 20)
+          .attr('y', -15)
+          .style('font-size', '12px')
+          .style('font-weight', 'bold')
+          .text(`${stakeholder.name}`);
+        
+        tooltip.append('text')
+          .attr('x', 20)
+          .attr('y', 5)
+          .style('font-size', '12px')
+          .text(`Impact: ${impactType.name}`);
+        
+        tooltip.append('text')
+          .attr('x', 20)
+          .attr('y', 25)
+          .style('font-size', '12px')
+          .text(`Value: ${d.value.toFixed(2)} (${d.value > 0 ? 'Positive' : d.value < 0 ? 'Negative' : 'Neutral'})`);
+      })
+      .on('mouseout', function() {
+        // Remove highlight
+        d3.select(this)
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 1);
+        
+        // Remove tooltip
+        svg.selectAll('.tooltip').remove();
+      });
+    
+    // Add x-axis (impact types)
+    svg.append('g')
+      .attr('transform', `translate(0,${height})`)
+      .call(d3.axisBottom(xScale).tickFormat(d => {
+        const impactType = impactTypes.find(i => i.id === d);
+        return impactType ? impactType.name : '';
+      }))
+      .selectAll('text')
+      .attr('transform', 'rotate(-45)')
+      .style('text-anchor', 'end')
+      .attr('dx', '-.8em')
+      .attr('dy', '.15em')
+      .style('font-size', '12px');
+    
+    // Add y-axis (stakeholders)
+    svg.append('g')
+      .call(d3.axisLeft(yScale).tickFormat(d => {
+        const stakeholder = stakeholders.find(s => s.id === d);
+        return stakeholder ? stakeholder.name : '';
+      }))
+      .selectAll('text')
+      .style('font-size', '12px');
+    
+    // Add title
+    svg.append('text')
+      .attr('x', width / 2)
+      .attr('y', -margin.top / 2)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '16px')
+      .style('font-weight', 'bold')
+      .text('Stakeholder Impact Analysis');
+    
+    // Add color legend
+    const legendWidth = 200;
+    const legendHeight = 20;
+    
+    const legendX = width - legendWidth;
+    const legendY = -margin.top / 2 - 10;
+    
+    const legendScale = d3.scaleLinear()
+      .domain([-1, 1])
+      .range([0, legendWidth]);
+    
+    const legendAxis = d3.axisBottom(legendScale)
+      .tickValues([-1, -0.5, 0, 0.5, 1])
+      .tickFormat(d => d === -1 ? 'Negative' : d === 0 ? 'Neutral' : d === 1 ? 'Positive' : '');
+    
+    const defs = svg.append('defs');
+    
+    const gradient = defs.append('linearGradient')
+      .attr('id', 'impact-gradient')
+      .attr('x1', '0%')
+      .attr('y1', '0%')
+      .attr('x2', '100%')
+      .attr('y2', '0%');
+    
+    gradient.selectAll('stop')
+      .data([-1, -0.5, 0, 0.5, 1])
+      .enter()
+      .append('stop')
+      .attr('offset', d => ((d + 1) / 2 * 100) + '%')
+      .attr('stop-color', d => colorScale(d));
+    
+    const legend = svg.append('g')
+      .attr('transform', `translate(${legendX},${legendY})`);
+    
+    legend.append('rect')
+      .attr('width', legendWidth)
+      .attr('height', legendHeight)
+      .style('fill', 'url(#impact-gradient)');
+    
+    legend.append('g')
+      .attr('transform', `translate(0,${legendHeight})`)
+      .call(legendAxis)
+      .selectAll('text')
+      .style('font-size', '10px');
+    
+  }, [data]);
+  
+  return (
+    <Card elevation={3} sx={{ mb: 4 }}>
+      <CardHeader title="Stakeholder Impact Analysis" />
+      <CardContent>
+        <div ref={heatmapRef} style={{ width: '100%', height: '500px' }} />
+        {data && (
+          <Box mt={2}>
+            <Typography variant="h6">Key Findings</Typography>
+            <Typography variant="body1">
+              Total Stakeholders: {data.stakeholders.length}
+            </Typography>
+            <Typography variant="body1">
+              Impact Categories: {data.impactTypes.length}
+            </Typography>
+            <Typography variant="body1">
+              Most Affected Stakeholder: {data.mostAffectedStakeholder?.name || 'N/A'}
+            </Typography>
+            <Typography variant="body1">
+              Most Significant Impact Type: {data.mostSignificantImpactType?.name || 'N/A'}
+            </Typography>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default StakeholderImpactHeatmap;
