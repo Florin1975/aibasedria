@@ -1,8 +1,8 @@
+import { defineConfig } from 'astro/config';
 import tailwind from "@astrojs/tailwind";
 
-/** @type {import('astro').AstroUserConfig} */
-export default {
-  base: "/regimpact-ai/",
+export default defineConfig({
+  site: 'https://florin1975.github.io',
+  base: '/aibasedria',
   integrations: [tailwind({ applyBaseStyles: true })],
-};
-
+});
