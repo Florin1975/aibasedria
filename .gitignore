@@ -1,0 +1,28 @@
+# Node
+node_modules/
+.pnpm-store/
+dist/
+.astro/
+.vercel/
+
+# Python
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Env
+.env
+.env.*
+
+# Mac
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Build artifacts
+coverage/
+site/

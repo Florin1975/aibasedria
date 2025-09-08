@@ -1,0 +1,37 @@
+---
+import "../styles/global.css";
+const { title = "RegImpact AI", description = "RIA Wizard demo" } = Astro.props;
+---
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+  </head>
+  <body class="h-full bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+    <header class="sticky top-0 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+      <nav class="mx-auto max-w-5xl flex items-center justify-between p-4">
+        <a href={import.meta.env.BASE_URL} class="font-semibold">RegImpact AI</a>
+        <ul class="flex gap-4 text-sm">
+          <li><a href={import.meta.env.BASE_URL + "wizard"} class="hover:underline">Wizard</a></li>
+          <li><a href={import.meta.env.BASE_URL + "playground"} class="hover:underline">Playground</a></li>
+        </ul>
+      </nav>
+    </header>
+    <main class="mx-auto max-w-5xl p-6">
+      <slot />
+    </main>
+    <footer class="mx-auto max-w-5xl p-6 text-center text-xs text-slate-500">
+      MIT Licensed • Static Pages + Local API
+    </footer>
+  </body>
+  <script>
+    // simple dark mode toggle using prefers scheme
+    try {
+      const mql = window.matchMedia('(prefers-color-scheme: dark)');
+      document.documentElement.classList.toggle('dark', mql.matches);
+    } catch {}
+  </script>
+</html>

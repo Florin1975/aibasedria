@@ -1,0 +1,8 @@
+site_name: RegImpact AI
+repo_url: https://github.com/OWNER/regimpact-ai
+theme:
+  name: material
+nav:
+  - Home: docs/index.md
+  - Local AI setup (safe): docs/local-ai.md
+  - Hosted demo (static): docs/hosted-demo.md

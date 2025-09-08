@@ -1,0 +1,236 @@
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+<BaseLayout title="RIA Wizard">
+  <section class="mb-4 sticky top-[60px] z-10 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800 p-3 rounded">
+    <div class="flex items-center justify-between">
+      <div class="text-sm">Step <span id="step-idx">1</span> / 6</div>
+      <div class="w-2/3 h-2 bg-slate-200 dark:bg-slate-700 rounded overflow-hidden">
+        <div id="progress" class="h-full bg-blue-600" style="width: 16%"></div>
+      </div>
+    </div>
+  </section>
+  <h1 class="text-2xl font-bold mb-2">RIA Wizard</h1>
+  <p class="text-sm text-slate-600 dark:text-slate-300 mb-4">Context → Options → Stakeholders → Impacts → Mitigations → Report</p>
+
+  <div class="mb-3">
+    <label class="text-sm font-medium">Preset packs</label>
+    <div class="flex gap-2 mt-2">
+      <button class="px-3 py-1.5 rounded border" data-preset="eu">EU</button>
+      <button class="px-3 py-1.5 rounded border" data-preset="us">US Federal</button>
+      <button class="px-3 py-1.5 rounded border" data-preset="uk">UK</button>
+    </div>
+  </div>
+
+  <form id="wizard" class="space-y-4">
+    <section data-step="1" class="card p-4 rounded border">
+      <h2 class="font-semibold mb-2">Context</h2>
+      <div class="grid gap-2 md:grid-cols-2">
+        <div>
+          <label class="text-xs">Jurisdiction</label>
+          <input id="jurisdiction" class="w-full mt-1 rounded border p-2" placeholder="EU / US / UK" />
+        </div>
+        <div>
+          <label class="text-xs">Policy area</label>
+          <input id="policy" class="w-full mt-1 rounded border p-2" placeholder="e.g., Digital Markets" />
+        </div>
+      </div>
+      <textarea id="context" class="w-full mt-2 rounded border p-2" rows="3" placeholder="Describe the problem, scope, objectives"></textarea>
+    </section>
+
+    <section data-step="2" class="card p-4 rounded border">
+      <h2 class="font-semibold mb-2">Options</h2>
+      <div id="options" class="space-y-2"></div>
+      <button type="button" id="addOption" class="mt-2 px-3 py-1.5 rounded border">Add option</button>
+    </section>
+
+    <section data-step="3" class="card p-4 rounded border">
+      <h2 class="font-semibold mb-2">Stakeholders</h2>
+      <div id="stakeholders" class="space-y-2"></div>
+      <button type="button" id="addStakeholder" class="mt-2 px-3 py-1.5 rounded border">Add stakeholder</button>
+    </section>
+
+    <section data-step="4" class="card p-4 rounded border">
+      <h2 class="font-semibold mb-2">Impacts</h2>
+      <div class="grid gap-2 md:grid-cols-3">
+        <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" id="risk_privacy"/> Privacy</label>
+        <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" id="risk_competition"/> Competition</label>
+        <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" id="risk_security"/> Security</label>
+      </div>
+    </section>
+
+    <section data-step="5" class="card p-4 rounded border">
+      <h2 class="font-semibold mb-2">Mitigations</h2>
+      <p class="text-sm text-slate-600 dark:text-slate-300">Will be suggested by AI or you can edit in Report.</p>
+    </section>
+
+    <section data-step="6" class="card p-4 rounded border">
+      <h2 class="font-semibold mb-2">Report</h2>
+      <div id="report" class="prose dark:prose-invert max-w-none text-sm"></div>
+      <div class="mt-3 flex gap-2">
+        <button type="button" id="exportMd" class="px-3 py-1.5 rounded border">Export .md</button>
+        <button type="button" id="exportPdf" class="px-3 py-1.5 rounded border">Export .pdf (print)</button>
+      </div>
+    </section>
+
+    <div class="flex items-center justify-between pt-2">
+      <div class="inline-flex gap-2 items-center">
+        <button type="button" id="aiSuggest" class="px-3 py-2 rounded bg-blue-600 text-white" title="Runs only with local API">Suggest with AI (local)</button>
+        <button type="button" id="chatgptHandoff" class="px-3 py-2 rounded border" title="Copy prompt and open ChatGPT">Open prompt in ChatGPT</button>
+      </div>
+      <div class="inline-flex gap-2 items-center">
+        <button type="button" id="prev" class="px-3 py-1.5 rounded border">Back</button>
+        <button type="button" id="next" class="px-3 py-1.5 rounded border">Next</button>
+      </div>
+    </div>
+    <p id="hostedTip" class="hidden text-xs text-slate-500 mt-2">
+      In hosted Pages, local AI is disabled. See README for enabling local API.
+      <a class="underline" href="https://github.com/OWNER/regimpact-ai#90-sec-quickstart" target="_blank">README</a>
+    </p>
+    <p id="status" class="text-xs text-slate-500 mt-2"></p>
+  </form>
+
+  <script>
+    const stepCount = 6; let step = 1;
+    const stepIdxEl = document.getElementById('step-idx');
+    const progressEl = document.getElementById('progress');
+    const sections = Array.from(document.querySelectorAll('[data-step]'));
+    const statusEl = document.getElementById('status');
+    const hostedTip = document.getElementById('hostedTip');
+    const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
+    if (!isLocal) hostedTip.classList.remove('hidden');
+
+    function renderStep(){
+      sections.forEach((s)=>{ s.style.display = (Number(s.dataset.step)===step)?'block':'none'; });
+      stepIdxEl.textContent = String(step);
+      progressEl.style.width = Math.round((step/stepCount)*100)+'%';
+    }
+    function addRow(containerId, placeholder){
+      const c = document.getElementById(containerId);
+      const div = document.createElement('div'); div.className='flex gap-2';
+      const input = document.createElement('input'); input.className='flex-1 rounded border p-2'; input.placeholder=placeholder;
+      const btn = document.createElement('button'); btn.type='button'; btn.className='px-2 rounded border'; btn.textContent='Remove';
+      btn.addEventListener('click',()=>div.remove());
+      div.append(input, btn); c.appendChild(div);
+    }
+    document.getElementById('addOption').addEventListener('click',()=>addRow('options','Option text'));
+    document.getElementById('addStakeholder').addEventListener('click',()=>addRow('stakeholders','Stakeholder group'));
+    // initial rows
+    addRow('options','Option A'); addRow('options','Option B'); addRow('stakeholders','Consumers');
+
+    function collect(){
+      const ctx = document.getElementById('context').value.trim();
+      const jurisdiction = document.getElementById('jurisdiction').value.trim();
+      const policy = document.getElementById('policy').value.trim();
+      const options = Array.from(document.querySelectorAll('#options input')).map(i=>i.value.trim()).filter(Boolean);
+      const stakeholders = Array.from(document.querySelectorAll('#stakeholders input')).map(i=>i.value.trim()).filter(Boolean);
+      const riskToggles = {
+        privacy: document.getElementById('risk_privacy').checked,
+        competition: document.getElementById('risk_competition').checked,
+        security: document.getElementById('risk_security').checked,
+      };
+      const fullContext = `${jurisdiction ? jurisdiction+': ' : ''}${policy ? policy+' — ' : ''}${ctx}`.trim();
+      return { context: fullContext, options, stakeholders, riskToggles };
+    }
+    function toMarkdown(analysis){
+      const { scope_summary, impact_matrix, mitigation_checklist } = analysis || {};
+      const req = collect();
+      const lines = [];
+      lines.push('# RIA Report');
+      lines.push('');
+      lines.push('## Context');
+      lines.push(req.context || '(none)');
+      lines.push('');
+      lines.push('## Scope Summary');
+      lines.push(scope_summary || '(pending)');
+      lines.push('');
+      lines.push('## Impact Matrix');
+      lines.push('| Option | Economic | Social | Legal |');
+      lines.push('|---|---|---|---|');
+      (impact_matrix||[]).forEach(r=>{ lines.push(`| ${r.option} | ${r.economic} | ${r.social} | ${r.legal} |`); });
+      lines.push('');
+      lines.push('## Mitigation Checklist');
+      (mitigation_checklist||[]).forEach(m=>lines.push(`- ${m}`));
+      lines.push('');
+      return lines.join('\n');
+    }
+    function download(name, text){
+      const blob = new Blob([text], {type:'text/plain'}); const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url);
+    }
+    function buildPrompt(){
+      const req = collect();
+      return `You are assisting with a Regulatory Impact Assessment.\n`+
+        `Context: ${req.context}\n`+
+        `Options: ${JSON.stringify(req.options)}\n`+
+        `Stakeholders: ${JSON.stringify(req.stakeholders)}\n`+
+        `Risk toggles: ${JSON.stringify(req.riskToggles)}\n`+
+        `Return JSON with: scope_summary (3 sentences), impact_matrix (per option econ/social/legal), mitigation_checklist (bulleted).`;
+    }
+    function showStatus(msg){ statusEl.textContent = msg; }
+
+    document.getElementById('chatgptHandoff').addEventListener('click', async ()=>{
+      const prompt = buildPrompt();
+      try { await navigator.clipboard.writeText(prompt); } catch {}
+      window.open('https://chat.openai.com/','_blank');
+      showStatus('Prompt copied. Pasted into ChatGPT.');
+    });
+
+    document.getElementById('aiSuggest').addEventListener('click', async ()=>{
+      if (!isLocal){ showStatus('Local API disabled on hosted Pages.'); return; }
+      const req = collect();
+      showStatus('Analyzing…');
+      try {
+        const res = await fetch('http://localhost:8000/api/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(req)});
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        const data = await res.json();
+        const md = toMarkdown(data);
+        document.getElementById('report').innerText = md;
+        showStatus('Analysis ready. You can export below.');
+      } catch (e){ showStatus('Failed to reach local API. See README to enable.'); }
+    });
+
+    document.getElementById('exportMd').addEventListener('click', ()=>{
+      const md = toMarkdown({}); download('ria-report.md', md);
+    });
+    document.getElementById('exportPdf').addEventListener('click', ()=>{ window.print(); });
+
+    document.getElementById('next').addEventListener('click', ()=>{ if (step<stepCount){ step++; renderStep(); } });
+    document.getElementById('prev').addEventListener('click', ()=>{ if (step>1){ step--; renderStep(); } });
+
+    const presetMap = {
+      eu: {
+        jurisdiction:'EU', policy:'Digital Markets', context:'Assess impact of interoperability mandates for gatekeepers.',
+        options:['Mandate full API access','Mandate basic interoperability','Non-binding code of conduct'],
+        stakeholders:['Consumers','SMEs','Gatekeepers','Developers'],
+        risk:{privacy:true,competition:true,security:true}
+      },
+      us: {
+        jurisdiction:'US Federal', policy:'AI Transparency', context:'Evaluate disclosure rules for high-risk AI systems.',
+        options:['Comprehensive disclosures','Targeted high-risk only','Self-regulatory guidelines'],
+        stakeholders:['Consumers','Civil Society','Agencies','Vendors'],
+        risk:{privacy:true,competition:false,security:true}
+      },
+      uk: {
+        jurisdiction:'UK', policy:'Data Access', context:'Open data requirements for public service vendors.',
+        options:['Open data by default','Open data with exemptions','Case-by-case release'],
+        stakeholders:['Citizens','SMEs','Procurement Bodies','Vendors'],
+        risk:{privacy:true,competition:true,security:false}
+      }
+    };
+    function applyPreset(p){
+      document.getElementById('jurisdiction').value = p.jurisdiction;
+      document.getElementById('policy').value = p.policy;
+      document.getElementById('context').value = p.context;
+      document.getElementById('options').innerHTML=''; p.options.forEach(o=>addRow('options','Option')); Array.from(document.querySelectorAll('#options input')).forEach((i,idx)=>i.value=p.options[idx]||'');
+      document.getElementById('stakeholders').innerHTML=''; p.stakeholders.forEach(s=>addRow('stakeholders','Stakeholder')); Array.from(document.querySelectorAll('#stakeholders input')).forEach((i,idx)=>i.value=p.stakeholders[idx]||'');
+      document.getElementById('risk_privacy').checked = p.risk.privacy;
+      document.getElementById('risk_competition').checked = p.risk.competition;
+      document.getElementById('risk_security').checked = p.risk.security;
+    }
+    document.querySelectorAll('[data-preset]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ const key = btn.getAttribute('data-preset'); applyPreset(presetMap[key]); showStatus('Preset loaded.'); });
+    });
+
+    renderStep();
+  </script>
+</BaseLayout>

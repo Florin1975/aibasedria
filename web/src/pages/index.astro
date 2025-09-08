@@ -1,0 +1,48 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+<BaseLayout title="RegImpact AI" description="RIA Wizard demo">
+  <section class="py-10">
+    <h1 class="text-3xl font-bold mb-2">RegImpact AI</h1>
+    <p class="text-slate-600 dark:text-slate-300">Co-orchestrated Regulatory Impact Assessment — static web + local AI.</p>
+    <div class="mt-6 flex gap-3">
+      <a href={import.meta.env.BASE_URL + "wizard"} class="px-4 py-2 rounded bg-blue-600 text-white">Try Wizard</a>
+      <a href={import.meta.env.BASE_URL + "playground"} class="px-4 py-2 rounded border">Playground</a>
+    </div>
+  </section>
+  <section class="grid md:grid-cols-3 gap-4 mt-10">
+    <div class="p-4 rounded border bg-white/60 dark:bg-slate-800/60">
+      <h3 class="font-semibold mb-1">Static Pages</h3>
+      <p class="text-sm text-slate-600 dark:text-slate-300">Deployed to GitHub Pages. No runtime secrets.</p>
+    </div>
+    <div class="p-4 rounded border bg-white/60 dark:bg-slate-800/60">
+      <h3 class="font-semibold mb-1">Local AI</h3>
+      <p class="text-sm text-slate-600 dark:text-slate-300">FastAPI on localhost only; optional OpenAI key.</p>
+    </div>
+    <div class="p-4 rounded border bg-white/60 dark:bg-slate-800/60">
+      <h3 class="font-semibold mb-1">Deterministic CI</h3>
+      <p class="text-sm text-slate-600 dark:text-slate-300">Pinned deps; lint, type-check, build in Actions.</p>
+    </div>
+  </section>
+  <section class="mt-10 p-4 rounded border bg-white/60 dark:bg-slate-800/60">
+    <h3 class="font-semibold mb-2">How it fits together</h3>
+    <div class="text-sm text-slate-600 dark:text-slate-300">
+      <div class="grid md:grid-cols-3 gap-4 items-center text-center">
+        <div>
+          <div class="font-medium">User</div>
+        </div>
+        <div>
+          <div class="font-medium">Web (Astro, Pages)</div>
+          <div class="text-xs">Co‑orchestrator UI</div>
+        </div>
+        <div>
+          <div class="font-medium">API (FastAPI, local)</div>
+          <div class="text-xs">Optional OpenAI</div>
+        </div>
+      </div>
+      <div class="mt-3 text-center text-xs">
+        User ↔ Web (static) • Web ↔ API (localhost only) • CI → Pages
+      </div>
+    </div>
+  </section>
+</BaseLayout>

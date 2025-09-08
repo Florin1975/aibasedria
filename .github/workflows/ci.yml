@@ -1,0 +1,56 @@
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'pnpm'
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install deps (pnpm)
+        run: pnpm i -w
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r api/requirements.txt ruff mypy
+
+      - name: Lint web
+        run: pnpm -F web lint
+
+      - name: Lint api (ruff)
+        run: ruff check api
+
+      - name: Type-check web
+        run: pnpm -F web typecheck
+
+      - name: Type-check api (mypy)
+        run: mypy --config-file api/mypy.ini api
+
+      - name: Build web
+        run: pnpm -F web build
+
+      - name: Test api
+        run: |
+          pip install pytest
+          pytest -q
+

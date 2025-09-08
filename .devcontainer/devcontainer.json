@@ -1,0 +1,32 @@
+{
+  "name": "RegImpact AI",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18",
+      "pnpm": "true"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "astro-build.astro-vscode",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "ms-python.vscode-pylance",
+        "bradlc.vscode-tailwindcss"
+      ]
+    }
+  },
+  "postCreateCommand": "corepack enable && pnpm i -w && pip install -r api/requirements.txt",
+  "forwardPorts": [4321, 8000],
+  "portsAttributes": {
+    "4321": { "label": "web (astro)", "onAutoForward": "openBrowser" },
+    "8000": { "label": "api (fastapi)", "onAutoForward": "openBrowser" }
+  }
+}
+
