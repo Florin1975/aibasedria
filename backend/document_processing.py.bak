@@ -899,7 +899,7 @@ class DocumentProcessor:
         self.info_extractor = InformationExtractor(use_ai=use_ai)
         
         try:
-            self.ai_enhancer = AIEnhancer() if use_ai else None
+            self.ai_enhancer = AIEnhancer() if pipeline is not None and use_ai else None
         except:
             logger.warning("Failed to initialize AI enhancer")
             self.ai_enhancer = None
