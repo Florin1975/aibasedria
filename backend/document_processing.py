@@ -6,7 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Union, Optional, Tuple, BinaryIO
 from enum import Enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import tempfile
 from pathlib import Path
 
@@ -104,7 +104,7 @@ class DocumentMetadata:
     modified_date: str = ""
     title: str = ""
     size_bytes: int = 0
-    custom_metadata: Dict[str, Any] = None
+    custom_metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert metadata to dictionary"""
@@ -128,15 +128,15 @@ class ProcessingResult:
     """Class for document processing results"""
     metadata: DocumentMetadata
     text_content: str
-    pages: List[str] = None
-    entities: Dict[str, List[str]] = None
-    tables: List[Dict[str, Any]] = None
-    form_fields: Dict[str, str] = None
-    classification: Dict[str, float] = None
+    pages: List[str] = field(default_factory=list)
+    entities: Dict[str, List[str]] = field(default_factory=dict)
+    tables: List[Dict[str, Any]] = field(default_factory=list)
+    form_fields: Dict[str, str] = field(default_factory=dict)
+    classification: Dict[str, float] = field(default_factory=dict)
     summary: str = ""
-    keywords: List[str] = None
-    sentiment: Dict[str, float] = None
-    error: str = None
+    keywords: List[str] = field(default_factory=list)
+    sentiment: Dict[str, float] = field(default_factory=dict)
+    error: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert processing result to dictionary"""
